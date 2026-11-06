@@ -1,0 +1,14 @@
+# Raw data: downloaded, never edited, recorded in metadata/ (commit what a person wrote,
+# not what a program can download or rebuild)
+data/raw/*
+data/processed/*
+results/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!results/.gitkeep
+
+# Python and OS files
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
