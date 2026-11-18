@@ -23,7 +23,10 @@ data/raw/              downloaded files, never edited (not in git)
 data/processed/        files the scripts build from raw (not in git)
 scripts/               analysis code, run in the order below
 results/               tables written by the scripts (not in git)
-docs/                  pre-registration, progress report, final figures
+docs/                  pre-registration, progress report, final figures, decisions
+workflow/, config/     Snakemake pipeline and its settings
+containers/            Dockerfile and Apptainer recipe
+pixi.toml, pixi.lock   software environment (exact versions)
 ```
 
 Rule of thumb: commit what a person wrote; do not commit what a program can
@@ -31,27 +34,32 @@ download or rebuild. That is why `data/` and `results/` are empty in git.
 
 ## How to reproduce
 
-Python 3 with pandas, numpy, scipy, statsmodels, scikit-learn and matplotlib.
-Run everything from the project folder.
+You need [Pixi](https://pixi.prefix.dev/latest/) and an internet connection.
 
-1. **Get the raw data.** Follow `metadata/README.md`: download the files listed in
-   `metadata/sources.tsv` into `data/raw/`, then check them with
-   `shasum -a 256 -c metadata/checksums.sha256`.
-2. **Pack the big copy-number file** (once): `python scripts/pack_gistic.py`
-3. **Build the analysis table:** `python scripts/x00_assemble.py`
-4. **Run the experiments** (each writes CSV files to `results/`):
+```bash
+pixi install          # builds the exact environment recorded in pixi.lock
+pixi run reproduce    # downloads the raw data and rebuilds every result (Snakemake)
+```
+
+A GitHub Action (`.github/workflows/reproduce.yml`) checks this on a fresh clone.
+Or run it in Docker: see `containers/README.md`. `pixi run dag` draws the workflow.
+
+The Snakemake rules in `workflow/Snakefile` run these scripts in order
+(`metadata/README.md` explains the raw files and checksums):
 
 | Script | What it does |
 |---|---|
+| `download_data.py`, `cbp.py`, `cbp2.py` | download raw data (GDC, cBioPortal) and verify checksums |
+| `pack_gistic.py` | pack the big copy-number file (once) |
+| `x00_assemble.py` | build the analysis table |
 | `x01_brca_core.py` | breast: variance split, adjustment ladder, rivals, dose and gain, doubly robust estimate |
 | `x02_pancancer.py`, `x02b_classes_pos.py`, `x02c_arm_pos.py` | other cancers, positive controls, deletion classes, gene vs arm loss |
 | `x03_scan.py`, `x03b_symmetry.py` | genome scan with 1,000 shuffles, loss vs gain |
-| `x04_external.py` | tumour RNA, METABRIC and cell lines (needs internet, cBioPortal API) |
+| `x04_external.py` | tumour RNA, METABRIC and cell lines (cBioPortal API) |
 | `x05_robust.py` | the 15 variations of the main estimate |
-| `make_figs.py`, `make_tables.py`, `make_numbers.py` | figures and tables for the report |
+| `make_figs.py`, `make_tables.py`, `make_numbers.py` | figures, tables and numbers for the report (`report/`) |
 
-`audit.py`, `pilot.py`, `cbp.py`, `cbp2.py` are the early exploration and
-download helpers, kept for the record. Random seeds are fixed in the scripts.
+`audit.py`, `pilot.py` are early exploration, kept for the record. Random seeds are fixed in the scripts.
 
 ## Method in four lines
 
