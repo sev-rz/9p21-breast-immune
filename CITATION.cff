@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "Immune-cold breast cancer and loss of chromosome 9p21.3"
+authors:
+  - family-names: "Rakhmon-Zoda"
+    given-names: "Sevinch"
+  - family-names: "Khanfar"
+    given-names: "Jenna"
+license: MIT
