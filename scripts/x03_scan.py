@@ -2,7 +2,7 @@
 import sys, warnings; warnings.filterwarnings('ignore'); sys.path.insert(0,'scripts')
 from common import *
 from statsmodels.stats.multitest import multipletests
-R = 'results/'; rng = np.random.default_rng(7); P = 1000
+R = 'results/'; rng = np.random.default_rng(7); NPERM = int(os.environ.get('NPERM', 1000))
 X, g, keys = load_gistic(); m = pd.read_pickle(P+'panc.pkl')
 b = m[(m.ct=='BRCA') & m['sub'].isin(['LumA','LumB','Basal','Her2'])].dropna(subset=['purity','logitLF']).reset_index(drop=True)
 kidx = {k:i for i,k in enumerate(keys)}; cols = np.array([kidx[k] for k in b.key]); Xb = X[:, cols]
@@ -19,8 +19,8 @@ def permute():
     p = np.arange(n)
     for ix in sidx: p[ix] = rng.permutation(ix)
     return p
-perms = [permute() for _ in range(P)]
-res = []; maxnull = {'loss': np.zeros(P), 'gain': np.zeros(P)}; allnull = {}
+perms = [permute() for _ in range(NPERM)]
+res = []; maxnull = {'loss': np.zeros(NPERM), 'gain': np.zeros(NPERM)}; allnull = {}
 for arm, ms in meta.groupby('arm'):
     bex = burden_ex(b, [arm]).to_numpy()
     out = {}
@@ -34,12 +34,12 @@ for arm, ms in meta.groupby('arm'):
             beta = (Xr*yr[:,None]).sum(0)/ss; rss = ((yr[:,None]-Xr*beta)**2).sum(0); se = np.sqrt(rss/(n-Zc.shape[1]-1)/ss); t = beta/se
             for j, c in enumerate(cand): out[(c, kind, adj)] = (beta[j], se[j], t[j])
             if adj == 'M3':
-                nullt = np.zeros((P, len(cand)))
+                nullt = np.zeros((NPERM, len(cand)))
                 for pi, p in enumerate(perms):
                     Xp = Xm[p]; Xpr = Xp - Q@(Q.T@Xp); ssp = (Xpr**2).sum(0); bp = (Xpr*yr[:,None]).sum(0)/ssp; rp = ((yr[:,None]-Xpr*bp)**2).sum(0); nullt[pi] = bp/np.sqrt(rp/(n-Zc.shape[1]-1)/ssp)
                 maxnull[kind] = np.maximum(maxnull[kind], np.abs(nullt).max(1))
                 for j, c in enumerate(cand):
-                    res.append(dict(idx=c, kind=kind, perm_p=(1+(np.abs(nullt[:,j]) >= abs(t[j])).sum())/(P+1)))
+                    res.append(dict(idx=c, kind=kind, perm_p=(1+(np.abs(nullt[:,j]) >= abs(t[j])).sum())/(NPERM+1)))
 rows = []
 for (c, kind, adj), (bt, se, t) in out.items() if False else []: pass
 # assemble from res + re-fit table
@@ -59,7 +59,7 @@ est = pd.DataFrame(est).pivot_table(index=['idx','kind'], columns='model', value
 tab = tab.merge(est, on=['idx','kind'])
 for kind in ['loss','gain']:
     i = tab.kind==kind; tab.loc[i,'q_bh'] = multipletests(tab.loc[i,'perm_p'], method='fdr_bh')[1]
-    tab.loc[i,'fwer_p'] = [(1+(maxnull[kind] >= abs(tv)).sum())/(P+1) for tv in tab.loc[i,'t_M3']]
+    tab.loc[i,'fwer_p'] = [(1+(maxnull[kind] >= abs(tv)).sum())/(NPERM+1) for tv in tab.loc[i,'t_M3']]
 tab.to_csv(R+'x5_scan.csv', index=False)
 for kind in ['loss','gain']:
     s = tab[tab.kind==kind]; print(kind, 'bands tested', len(s), '| perm_p<0.05:', int((s.perm_p<0.05).sum()), '| FDR<0.1:', int((s.q_bh<0.1).sum()), '| FWER<0.05:', int((s.fwer_p<0.05).sum()))

@@ -1,0 +1,124 @@
+---
+title: "Immune-cold breast cancer and loss of 9p21.3"
+subtitle: "Does losing CDKN2A/B, MTAP and the interferon genes make breast tumours immune cold?"
+author: "Sevinch Rakhmon-Zoda and Jenna Khanfar"
+date: today
+format:
+  html:
+    embed-resources: true
+    toc: true
+    code-fold: true
+    code-tools: true
+execute:
+  warning: false
+bibliography: references.bib
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+#| include: false
+import pandas as pd, numpy as np, matplotlib
+import matplotlib.pyplot as plt
+R = 'results/'
+shap = pd.read_csv(R + 'x1a_shapley.csv', index_col=0)
+rob = pd.read_csv(R + 'x14_robust.csv')
+can = pd.read_csv(R + 'x8_percancer_9p.csv')
+scan = pd.read_csv(R + 'x5_scan.csv')
+riv = pd.read_csv(R + 'x2b_rivals.csv')
+prim = rob.iloc[0]
+tot = shap.total_R2.iloc[0]
+pur = shap.loc['Purity', 'shapley_R2']
+loss = scan[scan.kind == 'loss'].copy()
+r9 = loss[loss.band == '9p21.3'].iloc[0]
+rank9 = int((loss.perm_p <= r9.perm_p).sum())  # same definition as scripts/make_numbers.py
+pos = can[can.positive_control.astype(str).str.lower().isin(['true', '1'])]
+```
+
+## Question
+
+The 9p21.3 region holds *CDKN2A*, *CDKN2B*, *MTAP* and the type-I interferon genes.
+Tumours that lose it are often described as "immune cold". We ask whether that holds
+in breast tumours once tumour purity and general copy-number damage are accounted
+for. The leukocyte fraction (DNA methylation based) is the immune outcome
+[@thorsson2018]. The analysis was pre-registered (`docs/PREREGISTRATION.md`).
+
+## Data
+
+TCGA PanCanAtlas files from the GDC and subtype labels from cBioPortal, listed with
+checksums in `metadata/`. Every number below is read from `results/*.csv` when this
+page renders.
+
+## Results
+
+**Purity explains most of the variation.** In `{python} int(prim.n)` breast tumours the
+model explains an R² of `{python} f"{tot:.2f}"`, and purity accounts for
+`{python} f"{pur:.2f}"` of it (@fig-shapley).
+
+```{python}
+#| label: fig-shapley
+#| fig-cap: "Share of the explained variance (Shapley decomposition of R²) in the leukocyte fraction, by group of predictors, for breast tumours."
+#| fig-alt: "Horizontal bar chart. Purity has by far the longest bar, subtype a short one, copy-number burden almost none."
+s = shap['shapley_R2'].sort_values()
+fig, ax = plt.subplots(figsize=(5.5, 2.6))
+ax.barh(s.index, s.values, color='#4c78a8')
+ax.set_xlabel('Share of R²'); fig.tight_layout(); plt.show()
+```
+
+**After adjustment, 9p21.3 loss has no detectable effect.** The adjusted effect is
+`{python} f"{prim.beta:.2f}"` logit units (95% interval `{python} f"{prim.lo95:.2f}"`
+to `{python} f"{prim.hi95:.2f}"`, p = `{python} f"{prim.p:.2f}"`). The interval does
+not exclude the smallest effect of interest (0.10), so this is underpowered, not
+proof of zero. @fig-robust shows 15 variations of the estimate.
+
+```{python}
+#| label: fig-robust
+#| fig-cap: "Effect of 9p21.3 loss on the logit leukocyte fraction under the primary model and its variations, with 95% intervals. The dashed lines mark the pre-registered smallest effect of interest, ±0.10."
+#| fig-alt: "Forest plot with one row per model variation; every interval crosses zero or lies close to it, and most extend past the dashed lines at plus and minus 0.10."
+d = rob.iloc[::-1]
+fig, ax = plt.subplots(figsize=(6.2, 0.28 * len(d) + 1))
+ax.errorbar(d.beta, range(len(d)), xerr=[d.beta - d.lo95, d.hi95 - d.beta], fmt='o', color='#4c78a8', ms=3, lw=1)
+ax.axvline(0, color='k', lw=.8); [ax.axvline(v, color='grey', ls='--', lw=.8) for v in (-.1, .1)]
+ax.set_yticks(range(len(d))); ax.set_yticklabels(d.spec, fontsize=6); ax.set_xlabel('Effect on logit(leukocyte fraction)')
+fig.tight_layout(); plt.show()
+```
+
+**No rival explanation helps.** Adding any of the four rival terms changes the
+cross-validated R² by at most `{python} f"{(riv.cvR2 - riv.cvR2.iloc[0]).abs().max():.4f}"`.
+
+```{python}
+#| label: tbl-rivals
+#| tbl-cap: "Model comparison: base model and the rival explanations."
+riv.round(4)
+```
+
+**Genome-wide, 9p21.3 is not special.** In the loss scan with label shuffles, 9p21.3 ranks
+`{python} rank9` of `{python} len(loss)` regions by permutation p-value
+(`{python} f"{r9.perm_p:.3f}"`) in the fully adjusted model.
+
+**Positive controls.** In the cancers where loss is expected to lower immune share
+(`{python} ', '.join(pos.ct)`), the same model finds effects of
+`{python} ', '.join(f"{b:.2f}" for b in pos.b3)` logit units respectively.
+
+## Reproducibility
+
+Software versions of this render:
+
+```{python}
+#| label: versions
+import sys, scipy, statsmodels, sklearn
+pd.Series({'python': sys.version.split()[0], 'pandas': pd.__version__, 'numpy': np.__version__,
+           'scipy': scipy.__version__, 'statsmodels': statsmodels.__version__,
+           'scikit-learn': sklearn.__version__, 'matplotlib': matplotlib.__version__}, name='version').to_frame()
+```
+
+Rebuild everything with `pixi run reproduce`. The pre-registration, decisions and
+data locations are in `docs/` and `metadata/`.
+
+## Data availability
+
+All data are public: TCGA PanCanAtlas (GDC), cBioPortal, METABRIC and CCLE. Sources,
+access dates and checksums are in `metadata/sources.tsv` and `metadata/checksums.sha256`.
+The 589 MB GISTIC file is not stored in Git; `pixi run download` fetches it.
+
+## References

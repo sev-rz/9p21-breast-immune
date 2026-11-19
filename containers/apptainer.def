@@ -1,0 +1,13 @@
+# Apptainer image of this project, made from the Docker image.
+# Build on Linux (or WSL2, or the cluster) after pushing the Docker image:
+#   apptainer build containers/9p21-breast-immune.sif containers/apptainer.def
+# Or straight from a local Docker image, without this file:
+#   apptainer build containers/9p21-breast-immune.sif docker-daemon://9p21-breast-immune:0.1.0
+Bootstrap: docker
+From: ghcr.io/sev-rz/9p21-breast-immune:0.1.0
+
+%runscript
+    exec /entrypoint.sh "$@"
+
+%labels
+    Project 9p21-breast-immune

@@ -1,0 +1,218 @@
+# Pipeline for "Immune-cold breast cancer and loss of 9p21.3".
+#
+# One rule per analysis script, in the order of the README. Scripts read from
+# data/raw/ and data/processed/ and write CSV files to results/, so every rule
+# lists its outputs explicitly and Snakemake rebuilds only what is out of date.
+#
+# Run from the project folder:  pixi run run-snakemake
+# (or: pixi run -e pipeline snakemake --cores 4)
+
+
+configfile: "config/config.yaml"
+
+
+RAW = "data/raw"
+PROC = "data/processed"
+RAW_GDC = [
+    f"{RAW}/leuk.tsv",
+    f"{RAW}/mastercalls.txt",
+    f"{RAW}/absolute_scores.tsv",
+    f"{RAW}/seg_scores.tsv",
+]
+RAW_CBP = [f"{RAW}/cbp_clinical.csv", f"{RAW}/cbp_patient.csv"]
+GISTIC = f"{RAW}/gistic_thr.tsv"
+PANC = f"{PROC}/panc.pkl"
+
+# What each analysis script writes (names as in the scripts, relative to results/)
+X01 = [
+    "x1a_corr",
+    "x1a_shapley",
+    "x2_ladder",
+    "x2b_rivals",
+    "x3_dose_cdkn2a",
+    "x3_gain_loss",
+    "x6_focal_arm",
+    "x7_subtype",
+    "x9_aipw_brca",
+    "x9_balance",
+]
+X02 = [
+    "x1b_purity_audit",
+    "x4_class_effects",
+    "x4_class_counts_thr1",
+    "x4_class_counts_thr2",
+    "x8_meta",
+    "x8_percancer_9p",
+]
+X03 = ["x5_scan", "x5_symmetry"]
+X04 = ["x10_rna_outcomes", "x11_ccle", "x12_metabric", "x12_metabric_subtype"]
+
+
+def res(names):
+    return [f"results/{n}.csv" for n in names]
+
+
+rule download_gdc:
+    """Raw PanCanAtlas files from the GDC, checked against metadata/."""
+    input:
+        "metadata/sources.tsv",
+        "metadata/checksums.sha256",
+    output:
+        RAW_GDC,
+        GISTIC,
+    log:
+        "results/logs/download_gdc.log",
+    shell:
+        "python scripts/download_data.py > {log} 2>&1"
+
+
+rule download_cbioportal:
+    """PAM50 subtype and clinical values from the cBioPortal API."""
+    output:
+        RAW_CBP,
+    log:
+        "results/logs/download_cbioportal.log",
+    shell:
+        "python scripts/download_cbioportal.py > {log} 2>&1"
+
+
+rule pack_gistic:
+    """Pack the 589 MB GISTIC table into a compact int8 array (once)."""
+    input:
+        GISTIC,
+    output:
+        f"{PROC}/thr.npy",
+        f"{PROC}/thr_genes.csv",
+        f"{PROC}/thr_samples.csv",
+    shell:
+        "python scripts/pack_gistic.py"
+
+
+rule assemble:
+    """One row per tumour: outcome, purity, burden, subtype."""
+    input:
+        RAW_GDC,
+        RAW_CBP,
+        f"{PROC}/thr.npy",
+        f"{PROC}/thr_genes.csv",
+        f"{PROC}/thr_samples.csv",
+    output:
+        PANC,
+        f"{PROC}/master.pkl",
+        f"{PROC}/arm_meta.json",
+    shell:
+        "python scripts/x00_assemble.py"
+
+
+rule x01_brca_core:
+    input:
+        PANC,
+    output:
+        res(X01),
+    shell:
+        "python scripts/x01_brca_core.py"
+
+
+rule x02_pancancer:
+    input:
+        PANC,
+    output:
+        res(X02),
+    shell:
+        "python scripts/x02_pancancer.py"
+
+
+rule x02b_classes_pos:
+    input:
+        PANC,
+    output:
+        "results/x4b_classes_pos.csv",
+    shell:
+        "python scripts/x02b_classes_pos.py"
+
+
+rule x02c_arm_pos:
+    input:
+        PANC,
+    output:
+        "results/x6b_arm_pan.csv",
+    shell:
+        "python scripts/x02c_arm_pos.py"
+
+
+rule x03_scan:
+    """Genome scan with label shuffles (the slow step)."""
+    input:
+        PANC,
+        f"{PROC}/thr.npy",
+        f"{PROC}/thr_genes.csv",
+        f"{PROC}/thr_samples.csv",
+    output:
+        res(X03),
+    params:
+        nperm=config["n_permutations"],
+    shell:
+        "NPERM={params.nperm} python scripts/x03_scan.py"
+
+
+rule x03b_symmetry:
+    input:
+        PANC,
+        f"{PROC}/thr.npy",
+        f"{PROC}/thr_genes.csv",
+        f"{PROC}/thr_samples.csv",
+    output:
+        "results/x5b_joint_loss_gain.csv",
+    shell:
+        "python scripts/x03b_symmetry.py"
+
+
+rule x04_external:
+    """Tumour RNA, METABRIC and CCLE through the cBioPortal API (needs internet)."""
+    input:
+        PANC,
+        f"{PROC}/thr_genes.csv",
+    output:
+        res(X04),
+    shell:
+        "python scripts/x04_external.py"
+
+
+rule x05_robust:
+    input:
+        PANC,
+    output:
+        "results/x14_robust.csv",
+    shell:
+        "python scripts/x05_robust.py"
+
+
+ANALYSIS = res(X01 + X02 + X03 + X04) + [
+    "results/x4b_classes_pos.csv",
+    "results/x6b_arm_pan.csv",
+    "results/x5b_joint_loss_gain.csv",
+    "results/x14_robust.csv",
+]
+
+
+rule report_assets:
+    """Figures, tables and the numbers quoted in the text."""
+    input:
+        PANC,
+        ANALYSIS,
+    output:
+        "report/numbers.tex",
+        directory("report/figures"),
+        directory("report/tables"),
+    shell:
+        "mkdir -p report/figures report/tables"
+        " && python scripts/make_figs.py"
+        " && python scripts/make_tables.py"
+        " && python scripts/make_numbers.py"
+
+
+rule all:
+    default_target: True
+    input:
+        ANALYSIS,
+        rules.report_assets.output,

@@ -1,0 +1,6 @@
+# Settings for the Snakemake pipeline (read by workflow/Snakefile).
+# The scripts in scripts/ fix their own random seeds (20261016 and 7).
+
+# Number of label shuffles in the genome scan (passed to scripts/x03_scan.py as NPERM).
+# Documented value is 1000; lower it only for a quick test run.
+n_permutations: 1000
