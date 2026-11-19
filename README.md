@@ -61,6 +61,23 @@ The Snakemake rules in `workflow/Snakefile` run these scripts in order
 
 `audit.py`, `pilot.py` are early exploration, kept for the record. Random seeds are fixed in the scripts.
 
+### Hardware and run time
+
+Any laptop or Linux machine with about 8 GB of memory and 3 GB of free disk (the raw
+GISTIC file is 589 MB and is packed to a smaller array). Needs an internet connection for
+the downloads. The genome scan (1,000 label shuffles) is the slow step; to test quickly,
+lower `n_permutations` in `config/config.yaml` and restore 1000 for the real results.
+
+### Expected outputs
+
+After `pixi run reproduce`:
+
+- `results/*.csv`: 26 result tables (`x1a_shapley.csv`, `x2_ladder.csv`, `x5_scan.csv`, `x14_robust.csv`, ...)
+- `report/figures/`, `report/tables/`, `report/numbers.tex`: figures, tables and numbers for the LaTeX report
+- `reports/9p21-report.html`: the Quarto report, computed from the result tables
+- headline numbers to compare: R² 0.67 of which purity 0.55; adjusted 9p21.3 effect 0.06 logit
+  units (95% interval -0.02 to 0.13); 9p21.3 ranks 104th of 756 regions
+
 ## Method in four lines
 
 - Outcome: logit of leukocyte fraction (LF, from DNA methylation). Exposure: CDKN2A
@@ -69,6 +86,14 @@ The Snakemake rules in `workflow/Snakefile` run these scripts in order
 - Rules fixed before the final fits (`docs/PREREGISTRATION.md`): smallest effect of
   interest 0.10 logit units; four positive-control cancers (LUAD, LUSC, HNSC, SKCM).
 - Four rival explanations: R1 interferon genes, R2 CDKN2A/MTAP, R3 whole 9p arm, R4 burden and purity only.
+
+## Data availability
+
+All data are public and none are stored in this repository: TCGA PanCanAtlas files from the GDC
+(downloaded by `scripts/download_data.py`), PAM50 subtype from cBioPortal
+(`scripts/download_cbioportal.py`), METABRIC and CCLE through the cBioPortal API. Sources, access
+dates and checksums are in `metadata/`; where the files sit on the laptop and on the cluster is in
+`metadata/data_locations.md`.
 
 ## Data and credits
 
