@@ -14,3 +14,9 @@ dependencies:
 - snakemake >=9.27.1,<10
 - snakefmt >=2.1.0,<3
 - graphviz >=14.1.2,<15
+- curl >=8
+- quarto >=1.9
+- jupyterlab >=4
+- ipykernel >=7
+- papermill >=2.6
+- pyyaml >=6.0.3,<7

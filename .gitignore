@@ -25,3 +25,12 @@ __pycache__/
 containers/*.tar.gz
 containers/*.sif
 report/
+
+/.quarto/
+**/*.quarto_ipynb
+
+# Quarto
+/.quarto/
+reports/*.html
+reports/*_files/
+**/*.quarto_ipynb

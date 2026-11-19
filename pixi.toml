@@ -19,6 +19,12 @@ matplotlib = ">=3.9"
 snakemake = ">=9.27.1,<10"
 snakefmt = ">=2.1.0,<3"
 graphviz = ">=14.1.2,<15"
+curl = ">=8"
+quarto = ">=1.9"
+jupyterlab = ">=4"
+ipykernel = ">=7"
+papermill = ">=2.6"
+pyyaml = ">=6.0.3,<7"
 
 [tasks]
 check = { cmd = "python --version && snakemake --version", description = "Check that the tools work" }
@@ -26,5 +32,6 @@ download = { cmd = "snakemake --cores 1 download_gdc download_cbioportal", descr
 run-snakemake = { cmd = "snakemake --cores 4", description = "Run the whole pipeline with Snakemake" }
 dag = { cmd = "mkdir -p results && snakemake --dag | dot -Tpdf > results/dag.pdf", description = "Draw the workflow graph (results/dag.pdf)" }
 lint = { cmd = "snakefmt --check workflow/Snakefile", description = "Check Snakefile formatting" }
+report = { cmd = "quarto render reports/9p21-report.qmd", depends-on = ["run-snakemake"], description = "Render the Quarto report" }
 # `reproduce` rebuilds every result from the raw data with one command.
-reproduce = [{ task = "run-snakemake" }]
+reproduce = [{ task = "report" }]
