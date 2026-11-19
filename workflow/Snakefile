@@ -70,11 +70,10 @@ rule download_cbioportal:
     """PAM50 subtype and clinical values from the cBioPortal API."""
     output:
         RAW_CBP,
-        temp(f"{RAW}/cbp_gistic.csv"),
     log:
         "results/logs/download_cbioportal.log",
     shell:
-        "python scripts/cbp.py > {log} 2>&1 && python scripts/cbp2.py >> {log} 2>&1"
+        "python scripts/download_cbioportal.py > {log} 2>&1"
 
 
 rule pack_gistic:
