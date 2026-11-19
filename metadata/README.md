@@ -14,6 +14,8 @@ downloaded from `https://api.gdc.cancer.gov/data/<file id>`. The cBioPortal
 studies are read through its public API (`scripts/cbp.py`, `scripts/cbp2.py`,
 `scripts/x04_external.py`).
 
+Column `cluster_copy` gives the same file's path on the MBZUAI cluster. See `data_locations.md` for the full map of raw and processed data on the laptop and the cluster.
+
 ## checksums.sha256
 
 SHA-256 checksum of each raw file we keep. Check with:
